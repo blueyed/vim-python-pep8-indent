@@ -9,4 +9,4 @@ test_visible:
 
 test_docker:
 	docker build -t vim-python-pep8-indent .
-	docker run --rm -ti vim-python-pep8-indent
+	docker run --rm -ti -e VIMRUNNER_REUSE_SERVER=1 vim-python-pep8-indent

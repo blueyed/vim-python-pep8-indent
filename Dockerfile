@@ -1,20 +1,16 @@
-FROM ruby:2.4.1-slim
-RUN sed s/^deb/deb-src/ /etc/apt/sources.list > /etc/apt/sources.list.d/deb-src.list
-RUN apt-get update && \
-    apt-get install -y curl xvfb && \
-    apt-get build-dep -y vim && \
-    rm -rf /var/lib/apt/lists/*
+FROM testbed/vim:latest
+
+RUN apk --no-cache add gtk+2.0-dev libx11-dev libxt-dev mcookie xauth xvfb
+RUN install_vim -tag master --enable-gui=gtk2 --with-x -build
+RUN ln -s /vim-build/bin/vim-master /usr/bin/gvim
+RUN gvim --version
+
 WORKDIR /vim-python-pep8-indent
 
-RUN curl -L https://github.com/vim/vim/archive/master.tar.gz | tar xzf - && \
-  cd vim-master && \
-  ./configure && make && make install && \
-  cd .. && rm -rf vim-master
-
 ADD Gemfile .
+RUN apk --no-cache add coreutils ruby-bundler
 RUN bundle install
+
 ADD . /vim-python-pep8-indent
 
-RUN vim --version
-
-ENTRYPOINT ["sh", "-c", "xvfb-run rspec spec -f doc $@", "ignore"]
+ENTRYPOINT ["sh", "-c", "Xvfb :99 & DISPLAY=:99 rspec spec $@", "ignore"]

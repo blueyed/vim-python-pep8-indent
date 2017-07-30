@@ -12,7 +12,7 @@ cache:
 before_script:
   - pip install --user vim-vint
   - |
-    DOCKER_IMG_FILE=/tmp/dockerimgs/vim-python-pep8-indent.1
+    DOCKER_IMG_FILE=/tmp/dockerimgs/vim-python-pep8-indent.2
     if [ -f "$DOCKER_IMG_FILE" ]; then
       docker load -i "$DOCKER_IMG_FILE"
     else

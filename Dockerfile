@@ -1,7 +1,7 @@
 FROM testbed/vim:latest
 
 RUN apk --no-cache add gtk+2.0-dev libx11-dev libxt-dev mcookie xauth xvfb
-RUN install_vim -tag master --enable-gui=gtk2 --with-x -build
+RUN install_vim -tag master --enable-gui=gtk2 --with-x --disable-xim -build
 RUN ln -s /vim-build/bin/vim-master /usr/bin/gvim
 RUN gvim --version
 

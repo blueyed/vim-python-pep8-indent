@@ -18,5 +18,5 @@ before_script:
   - docker build -t vim-python-pep8-indent .
   - docker save vim-python-pep8-indent > /tmp/dockerimgs/vim-python-pep8-indent
 script:
-  - docker run -ti --rm vim-python-pep8-indent
+  - docker run -ti -e VIMRUNNER_REUSE_SERVER=1 --rm vim-python-pep8-indent
   - vint **/*.vim

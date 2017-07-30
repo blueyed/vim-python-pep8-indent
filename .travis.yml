@@ -1,6 +1,6 @@
 dist: trusty
 sudo: false
-language: none
+language: generic
 services:
   - docker
 branches:

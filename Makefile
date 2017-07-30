@@ -6,3 +6,7 @@ test_slow:
 
 test_visible:
 	VIMRUNNER_REUSE_SERVER=1 bundle exec rspec
+
+test_docker:
+	docker build -t vim-python-pep8-indent .
+	docker run --rm -ti vim-python-pep8-indent

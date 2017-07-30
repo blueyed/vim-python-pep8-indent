@@ -12,11 +12,12 @@ cache:
 before_script:
   - pip install --user vim-vint
   - |
-    if [ -f /tmp/dockerimgs/vim-python-pep8-indent ]; then
-      docker load -i /tmp/dockerimgs/vim-python-pep8-indent
+    DOCKER_IMG_FILE=/tmp/dockerimgs/vim-python-pep8-indent.1
+    if [ -f "$DOCKER_IMG_FILE" ]; then
+      docker load -i "$DOCKER_IMG_FILE"
     else
       docker build -t vim-python-pep8-indent .
-      docker save vim-python-pep8-indent > /tmp/dockerimgs/vim-python-pep8-indent
+      docker save vim-python-pep8-indent > "$DOCKER_IMG_FILE"
     fi
 script:
   - docker run -ti -e VIMRUNNER_REUSE_SERVER=1 --rm vim-python-pep8-indent

@@ -58,23 +58,11 @@ endif
 let s:stop_statement = '^\s*\(break\|continue\|raise\|return\|pass\)\>'
 
 " Skip strings and comments. Return 1 for chars to skip.
-" jedi* refers to syntax definitions from jedi-vim for call signatures, which
-" are inserted temporarily into the buffer.
 let s:skip_special_chars = 'synIDattr(synID(line("."), col("."), 0), "name") ' .
-            \ '=~? "\\vstring|comment|jedi\\S"'
+            \ '=~? "\\vstring|comment"'
 
 let s:skip_after_opening_paren = 'synIDattr(synID(line("."), col("."), 0), "name") ' .
-            \ '=~? "\\vcomment|jedi\\S"'
-
-" Also ignore anything concealed.
-" Wrapper around synconcealed for older Vim (7.3.429, used on Travis CI).
-function! s:is_concealed(line, col)
-    let concealed = synconcealed(a:line, a:col)
-    return len(concealed) && concealed[0]
-endfunction
-if has('conceal')
-    let s:skip_special_chars .= '|| s:is_concealed(line("."), col("."))'
-endif
+            \ '=~? "\\vcomment"'
 
 
 let s:skip_search = 'synIDattr(synID(line("."), col("."), 0), "name") ' .
@@ -130,8 +118,8 @@ endfunction
 function! s:find_start_of_multiline_statement(lnum)
     let lnum = a:lnum
     while lnum > 0
-        if getline(lnum - 1) =~# '\\$'
-            let lnum = prevnonblank(lnum - 1)
+        if s:getline(lnum - 1) =~# '\\$'
+            let lnum = s:prevnonblank(lnum - 1)
         else
             let [paren_lnum, _] = s:find_opening_paren(lnum)
             if paren_lnum < 1
@@ -155,7 +143,7 @@ function! s:find_start_of_block(lnum, types, multiple)
         if indent < last_indent
             for type in types
                 let re = '\v^\s*'.type.'>'
-                if getline(lnum) =~# re
+                if s:getline(lnum) =~# re
                     if !a:multiple
                         return [indent]
                     endif
@@ -168,7 +156,7 @@ function! s:find_start_of_block(lnum, types, multiple)
             endfor
             let last_indent = indent(lnum)
         endif
-        let lnum = prevnonblank(lnum - 1)
+        let lnum = s:prevnonblank(lnum - 1)
     endwhile
     return r
 endfunction
@@ -176,7 +164,7 @@ endfunction
 " Is "expr" true for every position in "lnum", beginning at "start"?
 " (optionally up to a:1 / 4th argument)
 function! s:match_expr_on_line(expr, lnum, start, ...)
-    let text = getline(a:lnum)
+    let text = s:getline(a:lnum)
     let end = a:0 ? a:1 : len(text)
     if a:start > end
         return 1
@@ -200,12 +188,12 @@ function! s:indent_like_opening_paren(lnum)
     if paren_lnum <= 0
         return -2
     endif
-    let text = getline(paren_lnum)
+    let text = s:getline(paren_lnum)
     let base = indent(paren_lnum)
 
     let nothing_after_opening_paren = s:match_expr_on_line(
                 \ s:skip_after_opening_paren, paren_lnum, paren_col+1)
-    let starts_with_closing_paren = getline(a:lnum) =~# '^\s*[])}]'
+    let starts_with_closing_paren = s:getline(a:lnum) =~# '^\s*[])}]'
 
     let hang_closing = get(b:, 'python_pep8_indent_hang_closing',
                 \ get(g:, 'python_pep8_indent_hang_closing', 0))
@@ -233,7 +221,7 @@ endfunction
 
 " Match indent of first block of this type.
 function! s:indent_like_block(lnum)
-    let text = getline(a:lnum)
+    let text = s:getline(a:lnum)
     for [multiple, block_rules] in [
                 \ [0, s:block_rules],
                 \ [1, s:block_rules_multiple]]
@@ -263,15 +251,45 @@ function! s:indent_like_block(lnum)
     return -2
 endfunction
 
+" Wrapper around getline that looks up jedi-vim's b:_jedi_callsig_orig to get
+" the original line.
+function! s:getline(lnum) abort
+    let line = get(get(b:, '_jedi_callsig_orig', {}), a:lnum, 0)
+    if line is 0
+        return getline(a:lnum)
+    endif
+    return line
+endfunction
+
+" Wrapper around prevnonblank that looks up jedi-vim's b:_jedi_callsig_orig to
+" check the original line's contents additionally.
+function! s:prevnonblank(lnum) abort
+    let lnum = a:lnum
+    while 1
+        let lnum = prevnonblank(lnum)
+        if lnum < 1
+            return lnum
+        endif
+        let orig_line = get(get(b:, '_jedi_callsig_orig', {}), lnum, 0)
+        if orig_line is 0
+            return lnum
+        endif
+        if !empty(orig_line)
+            return lnum
+        endif
+        let lnum -= 1
+    endwhile
+endfunction
+
 function! s:indent_like_previous_line(lnum)
-    let lnum = prevnonblank(a:lnum - 1)
+    let lnum = s:prevnonblank(a:lnum - 1)
 
     " No previous line, keep current indent.
     if lnum < 1
       return -1
     endif
 
-    let text = getline(lnum)
+    let text = s:getline(lnum)
     let start = s:find_start_of_multiline_statement(lnum)
     let base = indent(start)
     let current = indent(a:lnum)
@@ -297,7 +315,7 @@ function! s:indent_like_previous_line(lnum)
         " If this line is the continuation of a control statement
         " indent further to distinguish the continuation line
         " from the next logical line.
-        if getline(start) =~# b:control_statement
+        if s:getline(start) =~# b:control_statement
             return base + s:sw() * 2
         endif
 
@@ -305,17 +323,17 @@ function! s:indent_like_previous_line(lnum)
         return base + s:sw()
     endif
 
-    let empty = getline(a:lnum) =~# '^\s*$'
+    let empty = s:getline(a:lnum) =~# '^\s*$'
 
     " Current and prev line are empty, next is not -> indent like next.
     if empty && a:lnum > 1 &&
-          \ (getline(a:lnum - 1) =~# '^\s*$') &&
-          \ !(getline(a:lnum + 1) =~# '^\s*$')
+          \ (s:getline(a:lnum - 1) =~# '^\s*$') &&
+          \ !(s:getline(a:lnum + 1) =~# '^\s*$')
       return indent(a:lnum + 1)
     endif
 
     " If the previous statement was a stop-execution statement or a pass
-    if getline(start) =~# s:stop_statement
+    if s:getline(start) =~# s:stop_statement
         " Remove one level of indentation if the user hasn't already dedented
         if empty || current > base - s:sw()
             return base - s:sw()
@@ -341,7 +359,7 @@ endfunction
 
 " Is the syntax at lnum (and optionally cnum) a python string?
 function! s:is_python_string(lnum, ...)
-    let line = getline(a:lnum)
+    let line = s:getline(a:lnum)
     let linelen = len(line)
     if linelen < 1
       let linelen = 1
@@ -362,8 +380,8 @@ function! GetPythonPEPIndent(lnum)
         return 0
     endif
 
-    let line = getline(a:lnum)
-    let prevline = getline(a:lnum-1)
+    let line = s:getline(a:lnum)
+    let prevline = s:getline(a:lnum-1)
 
     " Multilinestrings: continous, docstring or starting.
     if s:is_python_string(a:lnum-1, len(prevline))
